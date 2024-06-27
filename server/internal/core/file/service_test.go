@@ -141,7 +141,7 @@ func TestService_Upload(t *testing.T) {
 		size := 10
 		owner := user.NewID()
 
-		file, err := Create(content, ct, "original", Size(size), owner)
+		file, err := Create(content, ct, filepath, Size(size), owner)
 		require.NoError(t, err)
 
 		filesMock.On("ByOwnerByPath", owner, filepath).Return((*File)(file), nil).Once()
@@ -155,6 +155,42 @@ func TestService_Upload(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, file.ID, id)
+	})
+}
+
+func TestService_Move(t *testing.T) {
+	t.Run("moves a file to a valid path", func(t *testing.T) {
+		t.Parallel()
+
+		contentsMock := NewContentsMock(t)
+		filesMock := NewFilesMock(t)
+
+		service := NewService(contentsMock, filesMock)
+
+		ctx := context.Background()
+
+		owner := user.NewID()
+		f, err := Create(strings.NewReader(""), "text/plain", "test.txt", 0, owner)
+		require.NoError(t, err)
+		require.NotNil(t, f)
+
+		newPath := Path("/hello.txt")
+		u := f.Clone()
+		u.Path = newPath
+
+		filesMock.On("Save", mock.MatchedBy(func(fu File) bool {
+			return fu.ID == f.ID && fu.Path == newPath
+		})).Return(&u, nil).Once()
+
+		updated, err := service.Move(ctx, *f, newPath)
+		require.NoError(t, err)
+		require.NotNil(t, updated)
+
+		defer contentsMock.AssertExpectations(t)
+		defer filesMock.AssertExpectations(t)
+
+		assert.Equal(t, f.ID, updated.ID)
+		assert.Equal(t, newPath, updated.Path)
 	})
 }
 

@@ -53,7 +53,7 @@ func (s *Service) Upload(ctx context.Context, upload FileUpload, owner user.ID) 
 	if f == nil {
 		f, err = Create(upload.Content, upload.ContentType, upload.Path, upload.Size, owner)
 	} else {
-		err = f.Update(upload.Content, upload.ContentType, upload.Path, upload.Size)
+		err = f.UpdateContent(upload.Content, upload.ContentType, upload.Size)
 	}
 
 	if err != nil {
@@ -73,6 +73,19 @@ func (s *Service) Upload(ctx context.Context, upload FileUpload, owner user.ID) 
 
 func (s *Service) Download(ctx context.Context, f File) (Content, error) {
 	return s.contents.Load(ctx, f)
+}
+
+func (s *Service) Move(ctx context.Context, f File, newPath Path) (*File, error) {
+	if err := f.ChangePath(newPath); err != nil {
+		return nil, fmt.Errorf("failed to change path of file %s: %w", f.ID, err)
+	}
+
+	updated, err := s.files.Save(ctx, f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to store file %s: %w", f.ID, err)
+	}
+
+	return updated, nil
 }
 
 func (s *Service) Delete(ctx context.Context, id ID) error {
